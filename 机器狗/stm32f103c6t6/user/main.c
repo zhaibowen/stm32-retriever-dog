@@ -9,13 +9,25 @@
 #include "NRF24L01.h"
 #include "math.h"
 #include "Servo.h"
+#include "inverse_kinematics.h"
+#include "Gait.h"
 
 uint8_t Buf[32] = {0};
 uint16_t Lx, Ly, Rx, Ry;
 uint8_t Key0, Key1, Key2, Key3, Key4, Key5;
 float i2c_freq = 400000; // Hz
+float body_length = 112;
+float body_width = 104.8;
+float thigh_length = 80;
+float shank_length = 60;
+float rise_height = 30;
+float gravity_shift_x = 0;
+float gravity_shift_z = 110;
+uint8_t init_ang = 90;
+uint8_t init_ang_arr[4][2] = {{94, 91}, {87, 89}, {88, 91}, {93, 90}};
 
 void remote_control_run(void);
+void servo_output(float ham1, float ham2, float ham3, float ham4, float shank1, float shank2, float shank3, float shank4);
 
 int main(void)
 {
@@ -34,11 +46,11 @@ int main(void)
 		return 0;
 	}
 
+    Motion_Trajectory MT;
+
 	int pknt = 0;
 	unsigned long timestamp_prev = 0;
 	uint8_t debug_flag = 1;
-	uint8_t init_ang = 90;
-	uint8_t init_ang_arr[4][2] = {{94, 91}, {87, 89}, {88, 91}, {94, 93}};
 	uint8_t leg_number = 0, leg_part = 0;
 	uint8_t calibration = 0;
 	while(1) {
@@ -55,7 +67,11 @@ int main(void)
 				}
 				calibration = 1;
 				printf("servo calibration, init angle: 90\r\n");
-			}
+			} else { // 站立
+                float thigh_angle, shank_angle;
+                inverse_funtion(thigh_length, shank_length, -gravity_shift_x, -gravity_shift_z, &thigh_angle, &shank_angle);
+                servo_output(thigh_angle, thigh_angle, thigh_angle, thigh_angle, shank_angle, shank_angle, shank_angle, shank_angle);
+            }
 		} else if (calibration) { // 进入舵机标定
 			uint8_t press_flag = 0;
 			if (Key1) { // 选择哪条腿
@@ -123,4 +139,15 @@ void remote_control_run(void) {
 		Key4 = Buf[12] ^ 1;
 		Key5 = Buf[13] ^ 1;
 	}
+}
+
+void servo_output(float ham1, float ham2, float ham3, float ham4, float shank1, float shank2, float shank3, float shank4) {
+    Servo_SetAngle(0, init_ang_arr[0][0] + init_ang - ham1);
+    Servo_SetAngle(1, init_ang_arr[0][1] - init_ang + shank1);
+    Servo_SetAngle(2, init_ang_arr[1][0] - init_ang + ham2);
+    Servo_SetAngle(3, init_ang_arr[1][1] + init_ang - shank2);
+    Servo_SetAngle(4, init_ang_arr[2][0] - init_ang + ham3);
+    Servo_SetAngle(5, init_ang_arr[2][1] + init_ang - shank3);
+    Servo_SetAngle(6, init_ang_arr[3][0] + init_ang - ham4);
+    Servo_SetAngle(7, init_ang_arr[3][1] - init_ang + shank4);
 }
